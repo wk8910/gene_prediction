@@ -69,7 +69,7 @@ sub run_augustus{
     foreach my $fa(@scaffolds){
         $fa=~/([^\/]+)\.fa$/;
         my $name=$1;
-        print "$bin --species=$species $fa > $outdir/gff/$name.gff\n";
+        print "$bin --species=$species $fa > $outdir/gff/augustus/$name.gff\n";
     }
 }
 
@@ -81,7 +81,7 @@ sub run_genemark{
     foreach my $fa(@scaffolds){
         $fa=~/([^\/]+)\.fa$/;
         my $name=$1;
-        print "$bin -m $mtx -o $outdir/gff/$name.gff $fa\n";
+        print "$bin -m $mtx -o $outdir/gff/genemark/$name.gff $fa\n";
     }
 }
 
