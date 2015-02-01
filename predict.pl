@@ -11,15 +11,28 @@ die "Usage: $0 <config file>\n" if(@ARGV<1);
 my %config=&readconfig($config);
 
 # simple parameters
-my $program_base=&get_param("program_base","single");
-my $outdir=&get_param("outdir","single");
-my $ref=&get_param("ref","single");
+my $program_base=&get_param("program_base");
+my $outdir=&get_param("outdir");
+my $ref=&get_param("ref");
 
 # programs
-my $augustus=&get_param("augustus","single");
-my $parallel=&get_param("parallel","single");
-my $genemark=&get_param("genemark","single");
-my $genemark_mtx=&get_param("genemark_mtx","single");
+
+my $parallel=&get_param("parallel");
+
+my $augustus=&get_param("augustus");
+my $augustus_training=&get_param("augustus_training");
+
+my $genemark=&get_param("genemark");
+my $genemark_training=&get_param("genemark_training");
+
+my $glimmerhmm=&get_param("glimmerhmm");
+my $glimmerhmm_training=&get_param("glimmerhmm_training");
+
+my $geneid=&get_param("geneid");
+my $geneid_training=&get_param("geneid_training");
+
+my $snap=&get_param("snap");
+my $snap_training=&get_param("snap_training");
 
 # complex prarameters
 my %protein=&get_param("protein","multi");
@@ -47,14 +60,25 @@ my @scaffolds=<$outdir/scaffolds/*.fa>;
 
 ### Denovo Prediction Section Start ###
 
-if($augustus){
-    my $species="human";
-    &run_augustus($augustus,$species);
+if($augustus && $augustus_training){
+    &run_augustus($augustus,$augustus_training);
 }
 
-# if(!$genemark && $genemark_mtx){
-#     &run_genemark($genemark,$genemark_mtx);
-# }
+if($genemark && $genemark_training){
+    &run_genemark($genemark,$genemark_training);
+}
+
+if($glimmerhmm && $glimmerhmm_training){
+    &run_glimmerhmm($glimmerhmm,$glimmerhmm_training);
+}
+
+if($geneid && $geneid_training){
+    &run_geneid($geneid,$geneid_training);
+}
+
+if($snap && $snap_training){
+    &run_snap($snap,$snap_training);
+}
 
 ### END OF PROGRAM ###
 
@@ -85,9 +109,49 @@ sub run_genemark{
     }
 }
 
+sub run_glimmerhmm{
+    my ($bin,$dir)=@_;
+
+    `mkdir $outdir/gff/glimmerhmm` if(!-e "$outdir/gff/glimmerhmm");
+
+    foreach my $fa(@scaffolds){
+        $fa=~/([^\/]+)\.fa$/;
+        my $name=$1;
+        print "$bin $fa $dir -o $outdir/gff/glimmerhmm/$name.gff -g -f\n";
+    }
+}
+
+sub run_geneid{
+    my ($bin,$param)=@_;
+
+    my $gff_dir="$outdir/gff/geneid";
+
+    `mkdir $gff_dir` if(!-e $gff_dir);
+
+    foreach my $fa(@scaffolds){
+        $fa=~/([^\/]+)\.fa$/;
+        my $name=$1;
+        print "$bin -3 -P $param $fa > $gff_dir/$name.gff\n";
+    }
+}
+
+sub run_snap{
+    my ($bin,$hmm)=@_;
+
+    my $gff_dir="$outdir/gff/snap";
+
+    `mkdir $gff_dir` if(!-e $gff_dir);
+
+    foreach my $fa(@scaffolds){
+        $fa=~/([^\/]+)\.fa$/;
+        my $name=$1;
+        print "$bin $hmm $fa -gff > $gff_dir/$name.gff\n";
+    }
+}
+
 sub get_param{
     my ($param,$type)=@_;
-    if($type eq "single"){
+    if(!$type){
         my $detail="";
         foreach my $key(sort keys %config){
             next unless($key eq $param);
