@@ -64,24 +64,24 @@ if($augustus){
 sub run_augustus{
     my ($bin,$species)=@_;
 
-    `mkdir $outdir/gff/augustus` if(!-e "gff");
+    `mkdir $outdir/gff/augustus` if(!-e "$outdir/gff/augustus");
 
     foreach my $fa(@scaffolds){
         $fa=~/([^\/]+)\.fa$/;
         my $name=$1;
-        print "$bin --species=$species $fa > gff/$name.gff\n";
+        print "$bin --species=$species $fa > $outdir/gff/$name.gff\n";
     }
 }
 
 sub run_genemark{
     my ($bin,$mtx)=@_;
 
-    `mkdir gff` if(!-e "gff");
+    `mkdir $outdir/gff/genemark` if(!-e "$outdir/gff/genemark");
 
     foreach my $fa(@scaffolds){
         $fa=~/([^\/]+)\.fa$/;
         my $name=$1;
-        print "$bin -m $mtx -o gff/$name.gff $fa\n";
+        print "$bin -m $mtx -o $outdir/gff/$name.gff $fa\n";
     }
 }
 
