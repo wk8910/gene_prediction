@@ -49,6 +49,7 @@ if(-e $outdir){
 `mkdir $outdir`;
 `mkdir $outdir/scaffolds`;
 `mkdir $outdir/gff`;
+`mkdir $outdir/gff/ab_initio`;
 
 `$program_base/tools/split_fasta.pl $ref $outdir/scaffolds`;
 
@@ -88,43 +89,49 @@ if($snap && $snap_training){
 sub run_augustus{
     my ($bin,$species)=@_;
 
-    `mkdir $outdir/gff/augustus` if(!-e "$outdir/gff/augustus");
+    my $gff_dir="$outdir/gff/ab_initio/augustus";
+
+    `mkdir $gff_dir` if(!-e $gff_dir);
 
     foreach my $fa(@scaffolds){
         $fa=~/([^\/]+)\.fa$/;
         my $name=$1;
-        print "$bin --species=$species $fa > $outdir/gff/augustus/$name.gff\n";
+        print "$bin --species=$species $fa > $gff_dir/$name.gff\n";
     }
 }
 
 sub run_genemark{
     my ($bin,$mtx)=@_;
 
-    `mkdir $outdir/gff/genemark` if(!-e "$outdir/gff/genemark");
+    my $gff_dir="$outdir/gff/ab_initio/genemark";
+
+    `mkdir $gff_dir` if(!-e $gff_dir);
 
     foreach my $fa(@scaffolds){
         $fa=~/([^\/]+)\.fa$/;
         my $name=$1;
-        print "$bin -m $mtx -o $outdir/gff/genemark/$name.gff $fa\n";
+        print "$bin -m $mtx -o $gff_dir/$name.gff $fa\n";
     }
 }
 
 sub run_glimmerhmm{
     my ($bin,$dir)=@_;
 
-    `mkdir $outdir/gff/glimmerhmm` if(!-e "$outdir/gff/glimmerhmm");
+    my $gff_dir="$outdir/gff/ab_initio/glimmerhmm";
+
+    `mkdir $gff_dir` if(!-e $gff_dir);
 
     foreach my $fa(@scaffolds){
         $fa=~/([^\/]+)\.fa$/;
         my $name=$1;
-        print "$bin $fa $dir -o $outdir/gff/glimmerhmm/$name.gff -g -f\n";
+        print "$bin $fa $dir -o $gff_dir/$name.gff -g -f\n";
     }
 }
 
 sub run_geneid{
     my ($bin,$param)=@_;
 
-    my $gff_dir="$outdir/gff/geneid";
+    my $gff_dir="$outdir/gff/ab_initio/geneid";
 
     `mkdir $gff_dir` if(!-e $gff_dir);
 
@@ -138,7 +145,7 @@ sub run_geneid{
 sub run_snap{
     my ($bin,$hmm)=@_;
 
-    my $gff_dir="$outdir/gff/snap";
+    my $gff_dir="$outdir/gff/ab_initio/snap";
 
     `mkdir $gff_dir` if(!-e $gff_dir);
 
