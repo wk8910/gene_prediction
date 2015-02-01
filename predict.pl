@@ -200,7 +200,7 @@ sub get_param{
 
 sub readconfig{
     my $config_file=shift;
-    open(SUBI,"< $config_file");
+    open(SUBI,"< $config_file") or die "Cannot open configuration file: $config_file\n";
     my %sub_config;
     my $line_no=0;
     while (<SUBI>) {
