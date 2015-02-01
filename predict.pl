@@ -11,28 +11,28 @@ die "Usage: $0 <config file>\n" if(@ARGV<1);
 my %config=&readconfig($config);
 
 # simple parameters
-my $program_base=&get_param("program_base","single");
-my $outdir=&get_param("outdir","single");
-my $ref=&get_param("ref","single");
+my $program_base=&get_param("program_base");
+my $outdir=&get_param("outdir");
+my $ref=&get_param("ref");
 
 # programs
 
-my $parallel=&get_param("parallel","single");
+my $parallel=&get_param("parallel");
 
-my $augustus=&get_param("augustus","single");
-my $augustus_training=&get_param("augustus_training","single");
+my $augustus=&get_param("augustus");
+my $augustus_training=&get_param("augustus_training");
 
-my $genemark=&get_param("genemark","single");
-my $genemark_training=&get_param("genemark_training","single");
+my $genemark=&get_param("genemark");
+my $genemark_training=&get_param("genemark_training");
 
-my $glimmerhmm=&get_param("glimmerhmm","single");
-my $glimmerhmm_training=&get_param("glimmerhmm_training","single");
+my $glimmerhmm=&get_param("glimmerhmm");
+my $glimmerhmm_training=&get_param("glimmerhmm_training");
 
-my $geneid=&get_param("geneid","single");
-my $geneid_training=&get_param("geneid_training","single");
+my $geneid=&get_param("geneid");
+my $geneid_training=&get_param("geneid_training");
 
-my $snap=&get_param("snap","single");
-my $snap_training=&get_param("snap_training","single");
+my $snap=&get_param("snap");
+my $snap_training=&get_param("snap_training");
 
 # complex prarameters
 my %protein=&get_param("protein","multi");
@@ -151,7 +151,7 @@ sub run_snap{
 
 sub get_param{
     my ($param,$type)=@_;
-    if($type eq "single"){
+    if(!$type){
         my $detail="";
         foreach my $key(sort keys %config){
             next unless($key eq $param);
