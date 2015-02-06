@@ -34,6 +34,11 @@ my $geneid_training=&get_param("geneid_training");
 my $snap=&get_param("snap");
 my $snap_training=&get_param("snap_training");
 
+my $formatdb=&get_param("formatdb");
+my $blastall=&get_param("blastall");
+
+my $genewise=&get_param("genewise");
+
 # complex prarameters
 my %protein=&get_param("protein","multi");
 
@@ -64,7 +69,8 @@ my @scaffolds=<$outdir/scaffolds/*.fa>;
 ### Denovo Prediction Section Start ###
 
 my $run_denovo="$outdir/run/01.denovo.sh";
-open(R,"> $outdir/run/denovo.sh") or die "Cannot write $outdir/run/denovo.sh !\n";
+#open(R,"> $outdir/run/denovo.sh") or die "Cannot write $outdir/run/denovo.sh !\n";
+open(R,"> $run_denovo") or die "Cannot write $run_denovo !\n";
 
 if($augustus && $augustus_training){
     &run_augustus($augustus,$augustus_training);
@@ -90,10 +96,33 @@ close R;
 
 if($thread_num){
     my $command="$parallel -j $thread_num < $run_denovo";
-    system($command);
+    print "$command\n";
+    #system($command);
 }
 else {
     print "sh $run_denovo\n";
+}
+
+### Homolog Prediction Section Start ###
+`mkdir $outdir/homolog` if (! -e "$outdir/homolog");
+if (scalar(keys %protein)>0){
+    if ($formatdb && $blastall && $genewise){
+        &run_homolog($formatdb,$blastall,$genewise);
+    }
+    
+    if($thread_num){
+        print "sh $outdir/run/02.homolog.01.blast.sh
+$parallel -j $thread_num < $outdir/run/02.homolog.02.genewise_input.sh
+$parallel -j $thread_num < $outdir/run/02.homolog.03.genewise_run.sh
+sh $outdir/run/02.homolog.04.genewise_output.sh
+";
+    }else{
+        print "sh $outdir/run/02.homolog.01.blast.sh
+sh $outdir/run/02.homolog.02.genewise_input.sh
+sh $outdir/run/02.homolog.03.genewise_run.sh
+sh $outdir/run/02.homolog.04.genewise_output.sh
+";
+    }
 }
 
 ### END OF PROGRAM ###
@@ -103,11 +132,11 @@ else {
 
 sub run_augustus{
     my ($bin,$species)=@_;
-
+    
     my $gff_dir="$outdir/gff/ab_initio/augustus";
-
+    
     `mkdir $gff_dir` if(!-e $gff_dir);
-
+    
     foreach my $fa(@scaffolds){
         $fa=~/([^\/]+)\.fa$/;
         my $name=$1;
@@ -117,9 +146,9 @@ sub run_augustus{
 
 sub run_genemark{
     my ($bin,$mtx)=@_;
-
+    
     my $gff_dir="$outdir/gff/ab_initio/genemark";
-
+    
     `mkdir $gff_dir` if(!-e $gff_dir);
 
     foreach my $fa(@scaffolds){
@@ -169,6 +198,37 @@ sub run_snap{
         my $name=$1;
         print R "$bin $hmm $fa -gff > $gff_dir/$name.gff\n";
     }
+}
+
+sub run_homolog{
+    my ($db,$blast,$bin)=@_;
+    for my $fa (@scaffolds){
+        `$db -i $fa -p F`;
+    }
+    my $blast_dir="$outdir/homolog/blast2gene";
+    `mkdir $blast_dir` if (! -e "$blast_dir");
+    my $genewise_dir="$outdir/homolog/genewise";
+    `mkdir $genewise_dir` if (! -e "$genewise_dir");
+    open (BLSH,">$outdir/run/02.homolog.01.blast.sh");
+    open (INPUT,">$outdir/run/02.homolog.02.genewise_input.sh");
+    #open (GENEWISE,">$outdir/run/02.homolog.03.genewise_run.sh");
+    for my $protein (sort keys %protein){
+        $protein=~/([^\/]+)$/;
+        my $protein_name=$1;
+        for my $fa (@scaffolds){
+            $fa=~/([^\/]+)\.fa$/;
+            my $ref_name=$1;
+            my $cpu="";
+            $cpu="-a $thread_num " if ($thread_num);
+            print BLSH "$blastall -p tblastn -d $fa -i $protein -e 1E-5 -o $blast_dir/$protein_name-$ref_name.tblastn $cpu; $program_base/tools/blast.parse.pl $blast_dir/$protein_name-$ref_name.tblastn $blast_dir/$protein_name-$ref_name.tblastn.bp ; $program_base/tools/blast2gene.pl $blast_dir/$protein_name-$ref_name.tblastn.bp > $blast_dir/$protein_name-$ref_name.tblastn.bp.bl2g ; $program_base/tools/TopBlostHit.pl $blast_dir/$protein_name-$ref_name.tblastn.bp.bl2g\n";
+            print INPUT "$program_base/tools/genewiseINPUT.pl $blast_dir/$protein_name-$ref_name.tblastn.bp.bl2g.tophit $protein $fa $bin $program_base/tools/TransCoordinate.pl\n";
+        }
+    }
+    close BLSH;
+    close INPUT;
+    open (GENEWISEOUT,">$outdir/run/02.homolog.04.genewise_output.sh");
+    print GENEWISEOUT "$program_base/tools/MergeSplitGff.pl $outdir\n";
+    close GENEWISEOUT;
 }
 
 sub get_param{
