@@ -3,8 +3,8 @@ use strict;
 use warnings;
 use Bio::SeqIO;
 
-my $dir='prediction_test/homolog/genewise';
-my ($bl2g,$pep,$ref,$genewise,$trans)=@ARGV;
+
+my ($dir,$bl2g,$pep,$ref,$genewise,$trans)=@ARGV;
 die "perl $0 *bl2g *protein *ref *genewise *trans\n" if (! $trans);
 
 my %seq;
