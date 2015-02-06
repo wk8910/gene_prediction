@@ -15,10 +15,10 @@ for my $in (@in){
     my @start = sort{$a<=>$b} ($line1[3],$line1[4]);
     $diffout{$name}{$line1[0]}{$start[0]}{$line1[8]}=$in;
 }
-
+`mkdir $outdir/gff/homolog` if (! -e "$outdir/gff/homolog");
 for my $k1 (sort keys %diffout){
     my $line=0;
-    open (O,">$outdir/homolog/$k1.homolog.gff") || die "$!";
+    open (O,">$outdir/gff/homolog/$k1.homolog.gff") || die "$!";
     for my $k2 (sort keys %{$diffout{$k1}}){
         for my $k3 (sort{$a<=>$b} keys %{$diffout{$k1}{$k2}}){
             for my $k4 (sort keys %{$diffout{$k1}{$k2}{$k3}}){
