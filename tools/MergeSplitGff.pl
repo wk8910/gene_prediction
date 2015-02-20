@@ -9,7 +9,6 @@ my %diffout;
 for my $in (@in){
     $in=~/temp\/homolog\/blast2gene\/([^-]+)-\S+\/\S+\/genewise.gff.transCoordinate.gff$/;
     my $name=$1;
-    print STDERR "$in\n";
     my $line1=`head -1 $in`;
     chomp $line1;
     my @line1=split(/\t/,$line1);
