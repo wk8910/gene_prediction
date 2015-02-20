@@ -19,8 +19,9 @@ for my $in (@in){
 
 for my $species (sort keys %diffout){
     my $line=0;
-    open (O,"> $outdir/gff/homolog/$species.homolog.gff") or die "$!";
+    `mkdir $outdir/gff/homolog/$species` if(!-e "$outdir/gff/homolog/$species");
     for my $scaffold (sort keys %{$diffout{$species}}){
+        open(O,"> $outdir/gff/homolog/$species/$scaffold.gff");
         for my $position (sort{$a<=>$b} keys %{$diffout{$species}{$scaffold}}){
             for my $name (sort keys %{$diffout{$species}{$scaffold}{$position}}){
 	$line++;
@@ -31,7 +32,7 @@ for my $species (sort keys %diffout){
 	close F;
             }
         }
+        close O;
     }
-    close O;
 }
 
