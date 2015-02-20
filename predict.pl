@@ -57,6 +57,10 @@ if(-e $outdir){
 `mkdir $outdir/scaffolds`;
 `mkdir $outdir/gff`;
 `mkdir $outdir/gff/ab_initio`;
+`mkdir $outdir/gff/homolog`;
+
+`mkdir $outdir/temp`;
+`mkdir $outdir/temp/homolog/`;
 
 `$program_base/tools/split_fasta.pl $ref $outdir/scaffolds`;
 
@@ -69,7 +73,7 @@ my @scaffolds=<$outdir/scaffolds/*.fa>;
 ### Denovo Prediction Section Start ###
 
 my $run_denovo="$outdir/run/01.denovo.sh";
-#open(R,"> $outdir/run/denovo.sh") or die "Cannot write $outdir/run/denovo.sh !\n";
+
 open(R,"> $run_denovo") or die "Cannot write $run_denovo !\n";
 
 if($augustus && $augustus_training){
@@ -97,31 +101,42 @@ close R;
 if($thread_num){
     my $command="$parallel -j $thread_num < $run_denovo";
     print "$command\n";
-    #system($command);
+    system($command);
 }
 else {
     print "sh $run_denovo\n";
 }
 
 ### Homolog Prediction Section Start ###
-`mkdir $outdir/homolog` if (! -e "$outdir/homolog");
+
+
 if (scalar(keys %protein)>0){
     if ($formatdb && $blastall && $genewise){
         &run_homolog($formatdb,$blastall,$genewise);
-    }
-    
-    if($thread_num){
-        print "sh $outdir/run/02.homolog.01.blast.sh
-$parallel -j $thread_num < $outdir/run/02.homolog.02.genewise_input.sh
-$parallel -j $thread_num < $outdir/run/02.homolog.03.genewise_run.sh
-sh $outdir/run/02.homolog.04.genewise_output.sh
-";
-    }else{
-        print "sh $outdir/run/02.homolog.01.blast.sh
+
+        if($thread_num){
+            my $command1="sh $outdir/run/02.homolog.01.blast.sh";
+            print "$command1\n";
+            system($command1);
+
+            my $command2="$parallel -j $thread_num < $outdir/run/02.homolog.02.genewise_input.sh";
+            print "$command2\n";
+            system($command2);
+
+            my $command3="$parallel -j $thread_num < $outdir/run/02.homolog.03.genewise_run.sh";
+            print "$command3\n";
+            system($command3);
+
+            my $command4="sh $outdir/run/02.homolog.04.genewise_output.sh";
+            print "$command4\n";
+            system($command4);
+        }else{
+            print "sh $outdir/run/02.homolog.01.blast.sh
 sh $outdir/run/02.homolog.02.genewise_input.sh
 sh $outdir/run/02.homolog.03.genewise_run.sh
 sh $outdir/run/02.homolog.04.genewise_output.sh
 ";
+        }
     }
 }
 
@@ -205,9 +220,9 @@ sub run_homolog{
     for my $fa (@scaffolds){
         `$db -i $fa -p F`;
     }
-    my $blast_dir="$outdir/homolog/blast2gene";
+    my $blast_dir="$outdir/temp/homolog/blast2gene";
     `mkdir $blast_dir` if (! -e "$blast_dir");
-    my $genewise_dir="$outdir/homolog/genewise";
+    my $genewise_dir="$outdir/temp/homolog/genewise";
     `mkdir $genewise_dir` if (! -e "$genewise_dir");
     open (BLSH,">$outdir/run/02.homolog.01.blast.sh");
     open (INPUT,">$outdir/run/02.homolog.02.genewise_input.sh");
@@ -221,7 +236,7 @@ sub run_homolog{
             my $cpu="";
             $cpu="-a $thread_num " if ($thread_num);
             print BLSH "$blastall -p tblastn -d $fa -i $protein -e 1E-5 -o $blast_dir/$protein_name-$ref_name.tblastn $cpu; $program_base/tools/blast.parse.pl $blast_dir/$protein_name-$ref_name.tblastn $blast_dir/$protein_name-$ref_name.tblastn.bp ; $program_base/tools/blast2gene.pl $blast_dir/$protein_name-$ref_name.tblastn.bp > $blast_dir/$protein_name-$ref_name.tblastn.bp.bl2g ; $program_base/tools/TopBlostHit.pl $blast_dir/$protein_name-$ref_name.tblastn.bp.bl2g\n";
-            print INPUT "$program_base/tools/genewiseINPUT.pl $blast_dir $blast_dir/$protein_name-$ref_name.tblastn.bp.bl2g.tophit $protein $fa $bin $program_base/tools/TransCoordinate.pl\n";
+            print INPUT "$program_base/tools/genewiseINPUT.pl $outdir $blast_dir $blast_dir/$protein_name-$ref_name.tblastn.bp.bl2g.tophit $protein $fa $bin $program_base/tools/TransCoordinate.pl\n";
         }
     }
     close BLSH;
