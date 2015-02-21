@@ -4,8 +4,8 @@ use warnings;
 use Bio::SeqIO;
 
 
-my ($dir,$bl2g,$pep,$ref,$genewise,$trans)=@ARGV;
-die "perl $0 *bl2g *protein *ref *genewise *trans\n" if (! $trans);
+my ($outdir,$dir,$bl2g,$pep,$ref,$genewise,$trans)=@ARGV;
+die "perl $outdir $0 *bl2g *protein *ref *genewise *trans\n" if (! $trans);
 
 my %seq;
 my %bl2g;
@@ -30,7 +30,7 @@ while (<F>) {
 }
 close F;
 
-my $out="prediction_test/run/02.homolog.03.genewise_run.sh";
+my $out="$outdir/run/02.homolog.03.genewise_run.sh";
 if (-e "$out"){
     open (SH,">> $out");
 }else{
