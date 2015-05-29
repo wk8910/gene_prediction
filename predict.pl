@@ -39,6 +39,9 @@ my $blastall=&get_param("blastall");
 
 my $genewise=&get_param("genewise");
 
+my $evm=&get_param("evm");
+my $evm2gff3=&get_param("evm2gff3");
+
 # complex prarameters
 my %protein=&get_param("protein","multi");
 
@@ -61,6 +64,11 @@ if(-e $outdir){
 
 `mkdir $outdir/temp`;
 `mkdir $outdir/temp/homolog/`;
+`mkdir $outdir/temp/raw_gff`;
+`mkdir $outdir/temp/raw_gff/ab_initio`;
+
+`mkdir $outdir/temp/evm`;
+`mkdir $outdir/temp/evm/dataOFscaffolds`;
 
 `$program_base/tools/split_fasta.pl $ref $outdir/scaffolds`;
 
@@ -72,7 +80,7 @@ my @scaffolds=<$outdir/scaffolds/*.fa>;
 
 ### Denovo Prediction Section Start ###
 
-my $run_denovo="$outdir/run/01.denovo.sh";
+my $run_denovo="$outdir/run/01.denovo.01.run.sh";
 
 open(R,"> $run_denovo") or die "Cannot write $run_denovo !\n";
 
@@ -98,17 +106,16 @@ if($snap && $snap_training){
 
 close R;
 
-if($thread_num){
-    my $command="$parallel -j $thread_num < $run_denovo";
-    print "$command\n";
-    system($command);
-}
-else {
-    print "sh $run_denovo\n";
-}
+&run_job($run_denovo);
+
+my $TransferFormat="$outdir/run/01.denovo.02.transfer.sh";
+open(R,"> $TransferFormat");
+&TransferFormat();
+close R;
+
+&run_job($TransferFormat);
 
 ### Homolog Prediction Section Start ###
-
 
 if (scalar(keys %protein)>0){
     if ($formatdb && $blastall && $genewise){
@@ -140,6 +147,37 @@ sh $outdir/run/02.homolog.04.genewise_output.sh
     }
 }
 
+### HOMOLOG PREDICTION SECTION END ###
+
+
+
+### EVM SECTION START ###
+
+my $merge_gff="$outdir/run/03.evm.01.prepare.sh";
+open(R,"> $merge_gff");
+my $weights="$outdir/temp/evm/weights.txt";
+&MergeGff4EVM();
+close R;
+
+&run_job($merge_gff,"single");
+
+my $run_evm="$outdir/run/03.evm.02.run.sh";
+open(R,"> $run_evm");
+&runEVM();
+close R;
+
+&run_job($run_evm);
+
+my $collect_gff="$outdir/run/03.evm.03.collect.sh";
+&collect_gff();
+close R;
+
+&run_job($collect_gff,"single");
+
+### EVM SECTION END ###
+
+
+
 ### END OF PROGRAM ###
 
 
@@ -148,7 +186,7 @@ sh $outdir/run/02.homolog.04.genewise_output.sh
 sub run_augustus{
     my ($bin,$species)=@_;
     
-    my $gff_dir="$outdir/gff/ab_initio/augustus";
+    my $gff_dir="$outdir/temp/raw_gff/ab_initio/augustus";
     
     `mkdir $gff_dir` if(!-e $gff_dir);
     
@@ -160,23 +198,23 @@ sub run_augustus{
 }
 
 sub run_genemark{
-    my ($bin,$mtx)=@_;
+    my ($bin,$mod)=@_;
     
-    my $gff_dir="$outdir/gff/ab_initio/genemark";
+    my $gff_dir="$outdir/temp/raw_gff/ab_initio/genemark";
     
     `mkdir $gff_dir` if(!-e $gff_dir);
 
     foreach my $fa(@scaffolds){
         $fa=~/([^\/]+)\.fa$/;
         my $name=$1;
-        print R "$bin -m $mtx -o $gff_dir/$name.gff $fa\n";
+        print R "$bin -f gff3 -m $mod -o $gff_dir/$name.gff $fa\n";
     }
 }
 
 sub run_glimmerhmm{
     my ($bin,$dir)=@_;
 
-    my $gff_dir="$outdir/gff/ab_initio/glimmerhmm";
+    my $gff_dir="$outdir/temp/raw_gff/ab_initio/glimmerhmm";
 
     `mkdir $gff_dir` if(!-e $gff_dir);
 
@@ -190,7 +228,7 @@ sub run_glimmerhmm{
 sub run_geneid{
     my ($bin,$param)=@_;
 
-    my $gff_dir="$outdir/gff/ab_initio/geneid";
+    my $gff_dir="$outdir/temp/raw_gff/ab_initio/geneid";
 
     `mkdir $gff_dir` if(!-e $gff_dir);
 
@@ -204,7 +242,7 @@ sub run_geneid{
 sub run_snap{
     my ($bin,$hmm)=@_;
 
-    my $gff_dir="$outdir/gff/ab_initio/snap";
+    my $gff_dir="$outdir/temp/raw_gff/ab_initio/snap";
 
     `mkdir $gff_dir` if(!-e $gff_dir);
 
@@ -291,4 +329,81 @@ sub readconfig{
     }
     close SUBI;
     return(%sub_config);
+}
+
+sub MergeGff4EVM{
+    print R "perl $program_base/tools/Prepare4EVM.pl $outdir $weights\n";
+}
+
+sub runEVM{
+    foreach my $fa(@scaffolds){
+        $fa=~/([^\/]+)\.fa$/;
+        my $name=$1;
+        my $ab_initio="$outdir/temp/evm/dataOFscaffolds/$name/ab_initio.gff";
+        my $homolog="$outdir/temp/evm/dataOFscaffolds/$name/homolog.gff";
+        print R "$evm --genome $fa --weights $weights --gene_predictions $ab_initio --protein_alignments $homolog > $outdir/temp/evm/dataOFscaffolds/$name/evm.out; $evm2gff3 $outdir/temp/evm/dataOFscaffolds/$name/evm.out $name > $outdir/temp/evm/dataOFscaffolds/$name/evm.out.gff3\n";
+    }
+}
+
+sub run_job{
+    my ($script,$type)=@_;
+    if(!$type){
+        $type="multi";
+    }
+    if($type eq "single"){
+        if($thread_num){
+            my $command="sh $script";
+            print "$command\n";
+            system($command);
+        }
+        else {
+            print "sh $script\n";
+        }
+    }
+    elsif($type eq "multi") {
+        if($thread_num){
+            my $command="$parallel -j $thread_num < $script";
+            print "$command\n";
+            system($command);
+        }
+        else {
+            print "sh $script\n";
+        }
+    }
+}
+
+sub TransferFormat{
+    foreach my $fa(@scaffolds){
+        $fa=~/([^\/]+)\.fa$/;
+        my $name=$1;
+        if($augustus && $augustus_training){
+            my $gff="$outdir/temp/raw_gff/ab_initio/augustus/$name.gff";
+            `mkdir $outdir/gff/ab_initio/augustus` if(!-e "$outdir/gff/ab_initio/augustus");
+            print R "perl $program_base/tools/TransferFormat_augustus.pl $gff $outdir/gff/ab_initio/augustus/$name.gff\n";
+        }
+        if($genemark && $genemark_training){
+            my $gff="$outdir/temp/raw_gff/ab_initio/genemark/$name.gff";
+            `mkdir $outdir/gff/ab_initio/genemark` if(!-e "$outdir/gff/ab_initio/genemark");
+            print R "perl $program_base/tools/TransferFormat_genemark.pl $gff $outdir/gff/ab_initio/genemark/$name.gff\n";
+        }
+        if($glimmerhmm && $glimmerhmm_training){
+            my $gff="$outdir/temp/raw_gff/ab_initio/glimmerhmm/$name.gff";
+            `mkdir $outdir/gff/ab_initio/glimmerhmm` if(!-e "$outdir/gff/ab_initio/glimmerhmm");
+            print R "perl $program_base/tools/TransferFormat_glimmerhmm.pl $gff $outdir/gff/ab_initio/glimmerhmm/$name.gff\n";
+        }
+        if($geneid && $geneid_training){
+            my $gff="$outdir/temp/raw_gff/ab_initio/geneid/$name.gff";
+            `mkdir $outdir/gff/ab_initio/geneid` if(!-e "$outdir/gff/ab_initio/geneid");
+            print R "perl $program_base/tools/TransferFormat_geneid.pl $gff $outdir/gff/ab_initio/geneid/$name.gff\n";
+        }
+        if($snap && $snap_training){
+            my $gff="$outdir/temp/raw_gff/ab_initio/snap/$name.gff";
+            `mkdir $outdir/gff/ab_initio/snap` if(!-e "$outdir/gff/ab_initio/snap");
+            print R "perl $program_base/tools/TransferFormat_snap.pl $gff $outdir/gff/ab_initio/snap/$name.gff\n";
+        }
+    }
+}
+
+sub collect_gff{
+    print R "perl $program_base/tools/collect_gff.pl $outdir\n";
 }

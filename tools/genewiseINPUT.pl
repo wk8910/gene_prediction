@@ -19,7 +19,7 @@ while (my $seq=$pepfa->next_seq) {
 
 $bl2g=~/([^\/]+)\.tblastn.bp.bl2g.tophit/;
 my $species=$1;
-open (F,"$bl2g");
+open (F,"$bl2g") or die "Cannot open $bl2g\n";
 while (<F>) {
     chomp;
     my @a=split(/\t/,$_);
