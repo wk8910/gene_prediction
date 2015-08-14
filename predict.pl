@@ -169,6 +169,7 @@ close R;
 &run_job($run_evm);
 
 my $collect_gff="$outdir/run/03.evm.03.collect.sh";
+open (R,"> $collect_gff");
 &collect_gff();
 close R;
 
@@ -273,7 +274,7 @@ sub run_homolog{
             my $ref_name=$1;
             my $cpu="";
             $cpu="-a $thread_num " if ($thread_num);
-            print BLSH "$blastall -p tblastn -d $fa -i $protein -e 1E-5 -o $blast_dir/$protein_name-$ref_name.tblastn $cpu; $program_base/tools/blast.parse.pl $blast_dir/$protein_name-$ref_name.tblastn $blast_dir/$protein_name-$ref_name.tblastn.bp ; $program_base/tools/blast2gene.pl $blast_dir/$protein_name-$ref_name.tblastn.bp > $blast_dir/$protein_name-$ref_name.tblastn.bp.bl2g ; $program_base/tools/TopBlostHit.pl $blast_dir/$protein_name-$ref_name.tblastn.bp.bl2g\n";
+            print BLSH "$blastall -p tblastn -d $fa -i $protein -e 1E-5 -o $blast_dir/$protein_name-$ref_name.tblastn $cpu; $program_base/tools/blast.parse.pl $blast_dir/$protein_name-$ref_name.tblastn $blast_dir/$protein_name-$ref_name.tblastn.bp ; $program_base/tools/blast2gene.pl $blast_dir/$protein_name-$ref_name.tblastn.bp > $blast_dir/$protein_name-$ref_name.tblastn.bp.bl2g ; $program_base/tools/TopBlostHit.pl $blast_dir/$protein_name-$ref_name.tblastn.bp.bl2g ; rm $blast_dir/$protein_name-$ref_name.tblastn $blast_dir/$protein_name-$ref_name.tblastn.bp $blast_dir/$protein_name-$ref_name.tblastn.bp.bl2g\n";
             print INPUT "$program_base/tools/genewiseINPUT.pl $outdir $blast_dir $blast_dir/$protein_name-$ref_name.tblastn.bp.bl2g.tophit $protein $fa $bin $program_base/tools/TransCoordinate.pl\n";
         }
     }
@@ -290,7 +291,7 @@ sub get_param{
         my $detail="";
         foreach my $key(sort keys %config){
             next unless($key eq $param);
-            my @value = keys $config{$key};
+            my @value = keys %{$config{$key}};
             $detail   = $config{$key}{$value[0]};
             last;
         }
@@ -300,7 +301,7 @@ sub get_param{
         my %detail;
         foreach my $key(sort keys %config){
             next unless($key eq $param);
-            my @value=keys $config{$key};
+            my @value=keys %{$config{$key}};
             foreach my $value(sort @value){
 	my $result=$config{$key}{$value};
 	$detail{$result}++;
