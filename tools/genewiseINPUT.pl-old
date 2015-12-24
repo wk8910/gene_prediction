@@ -5,7 +5,7 @@ use Bio::SeqIO;
 
 
 my ($outdir,$dir,$bl2g,$pep,$ref,$genewise,$trans)=@ARGV;
-die "perl $0 outdir blast2geneDIR *bl2g *protein *ref *genewise *trans\n" if (scalar(@ARGV) != 7);
+die "perl $outdir $0 *bl2g *protein *ref *genewise *trans\n" if (! $trans);
 
 my %seq;
 my %bl2g;
@@ -30,9 +30,12 @@ while (<F>) {
 }
 close F;
 exit if (! %bl2g);
-my $out="$outdir/run/02.homolog.03.genewise_run";
-`mkdir $out` if (! -e "$out");
-open (SH,">$out/$species.sh")||die"$!\n$out/$species.sh\n";
+my $out="$outdir/run/02.homolog.03.genewise_run.sh";
+if (-e "$out"){
+    open (SH,">> $out");
+}else{
+    open (SH,"> $out");
+}
 my $reffa=Bio::SeqIO->new(-format=>"fasta",-file=>"$ref");
 while (my $seq=$reffa->next_seq) {
     my $chrid=$seq->id;
@@ -68,4 +71,3 @@ while (my $seq=$reffa->next_seq) {
     }
 }
 close SH;
-

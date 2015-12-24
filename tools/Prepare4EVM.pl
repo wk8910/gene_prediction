@@ -2,36 +2,41 @@
 use strict;
 use warnings;
 
-my ($outdir,$weights)=@ARGV;
-
-die "Usage: $0 <outdir> <weights file>\n" if(@ARGV<2);
-
-my @scaffolds=<$outdir/scaffolds/*.fa>;
-
-my @ab_initio=<$outdir/gff/ab_initio/*>;
-my @homolog  =<$outdir/gff/homolog/*>;
-
-&MergeGff4EVM("ab_initio",@ab_initio);
-&MergeGff4EVM("homolog",@homolog);
-
+my ($outdir,$weights,$ab_initio_stat,$homolog_stat,$rna_seq_stat)=@ARGV;
+die "perl $0 \$outdir \$weights \$ab_initio_stat \$homolog_stat \$rna_seq_stat\nexample: perl $0 02.prediction_output 02.prediction_output/temp/evm/weights.txt yes yes no" if (! $rna_seq_stat);
 my %input;
-foreach my $ab_initio(@ab_initio){
-    $ab_initio=~/([^\/]+)$/;
-    my $type=$1;
-    $input{ab_initio}{$type}=1;
+my @scaffolds=<$outdir/scaffolds/*.fa>;
+if ($ab_initio_stat eq 'yes'){
+    my @ab_initio=<$outdir/gff/ab_initio/*>;
+    &MergeGff4EVM("ab_initio",@ab_initio);
+    &Fillinput("ab_initio",@ab_initio);
 }
-foreach my $homolog(@homolog){
-    $homolog=~/([^\/]+)$/;
-    my $type=$1;
-    $input{homolog}{$type}=1;
+if ($homolog_stat eq 'yes'){
+    my @homolog=<$outdir/gff/homolog/*>;
+    &MergeGff4EVM("homolog",@homolog);
+    &Fillinput("homolog",@homolog);
+}
+if ($rna_seq_stat eq 'yes'){
+    my @rna_seq=<$outdir/gff/rna_seq/*>;
+    &MergeGff4EVM("rna_seq",@rna_seq);
+    &Fillinput("rna_seq",@rna_seq);
 }
 
 &writeWeightFile4EVM(\%input,$weights);
 
+sub Fillinput{
+    my $type=shift;
+    my @dir=@_;
+    for my $dir (@dir){
+        $dir=~/([^\/]+)$/;
+        my $software=$1;
+        $input{$type}{$software}=1;
+    }
+}
 sub MergeGff4EVM{
     my $type=shift;
     my @dir=@_;
-
+    
     foreach my $fa(@scaffolds){
         $fa=~/([^\/]+)\.fa$/;
         my $name=$1;
@@ -55,16 +60,22 @@ sub MergeGff4EVM{
         close O;
     }
 }
-
 sub writeWeightFile4EVM{
     my $input=shift;
     my $weights=shift;
+    my %method2print;
+    $method2print{ab_initio}{print}="ABINITIO_PREDICTION";
+    $method2print{ab_initio}{score}="1";
+    $method2print{homolog}{print}="PROTEIN";
+    $method2print{homolog}{score}="5";
+    $method2print{rna_seq}{print}="TRANSCRIPT";
+    $method2print{rna_seq}{score}="10";
+    
     open(O,"> $weights") or die "Cannot create weights file: $weights\n";
-    foreach my $type(sort keys %{$input{ab_initio}}){
-        print O "ABINITIO_PREDICTION\t$type\t1\n";
-    }
-    foreach my $type(sort keys %{$input{homolog}}){
-        print O "PROTEIN\t$type\t5\n";
+    foreach my $method (sort keys %input){
+        foreach my $type(sort keys %{$input{$method}}){
+            print O "$method2print{$method}{print}\t$type\t$method2print{$method}{score}\n";
+        }
     }
     close O;
 }

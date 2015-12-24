@@ -6,7 +6,7 @@ my $outdir=shift;
 
 my $outfile="$outdir/prediction.gff";
 
-my @gff=<$outdir/temp/evm/dataOFscaffolds/*/evm.out.gff3>;
+my @gff=<$outdir/temp/evm/dataOFscaffolds/*/evm.out.new.gff>;
 
 &merge_gff($outfile,@gff);
 

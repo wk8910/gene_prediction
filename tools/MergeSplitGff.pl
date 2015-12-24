@@ -5,9 +5,12 @@ use warnings;
 my $outdir=shift or die "perl $0 \$outdir\n";
 my @in=<$outdir/temp/homolog/blast2gene/*/*/genewise.gff.transCoordinate.gff>;
 
+my $LINE=0;
 my %diffout;
 for my $in (@in){
-    $in=~/temp\/homolog\/blast2gene\/([^-]+)-\S+\/\S+\/genewise.gff.transCoordinate.gff$/;
+    $LINE++;
+    print $LINE,"\t$in\n";
+    $in=~/temp\/homolog\/blast2gene\/([^-]+)-\S+\/\S+\/genewise.gff.transCoordinate.gff$/ or die "wrong name type: $in\n";
     my $name=$1;
     my $line1=`head -1 $in`;
     chomp $line1;
@@ -16,7 +19,8 @@ for my $in (@in){
     my @start = sort{$a<=>$b} ($line1[3],$line1[4]);
     $diffout{$name}{$line1[0]}{$start[0]}{$line1[8]}=$in;
 }
-
+print "done\n";
+print "writting out\n";
 for my $species (sort keys %diffout){
     my $line=0;
     `mkdir $outdir/gff/homolog/$species` if(!-e "$outdir/gff/homolog/$species");
