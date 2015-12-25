@@ -14,7 +14,9 @@ my %config=&readconfig($config);
 my $program_base=&get_param("program_base");
 my $outdir=&get_param("outdir");
 my $ref=&get_param("ref");
-
+my $transcript=&get_param("transcript");
+my $species=&get_param("species");
+my $gff2protein=&get_param("gff2protein");
 # programs
 
 my $parallel=&get_param("parallel");
@@ -42,6 +44,8 @@ my $genewise=&get_param("genewise");
 my $evm=&get_param("evm");
 my $evm2gff3=&get_param("evm2gff3");
 
+my $pasa_dir=&get_param("pasa_dir");
+
 # complex prarameters
 my %protein=&get_param("protein","multi");
 
@@ -66,6 +70,7 @@ if(-e $outdir){
 `mkdir $outdir/temp/homolog/`;
 `mkdir $outdir/temp/raw_gff`;
 `mkdir $outdir/temp/raw_gff/ab_initio`;
+`mkdir $outdir/temp/rna_seq`;
 
 `mkdir $outdir/temp/evm`;
 `mkdir $outdir/temp/evm/dataOFscaffolds`;
@@ -115,6 +120,8 @@ close R;
 
 &run_job($TransferFormat);
 
+### Denovo Prediction Section Done ###
+
 ### Homolog Prediction Section Start ###
 
 if (scalar(keys %protein)>0){
@@ -125,15 +132,15 @@ if (scalar(keys %protein)>0){
             my $command1="sh $outdir/run/02.homolog.01.blast.sh";
             print "$command1\n";
             system($command1);
-
+            
             my $command2="$parallel -j $thread_num < $outdir/run/02.homolog.02.genewise_input.sh";
             print "$command2\n";
             system($command2);
-
+            
             my $command3="$parallel -j $thread_num < $outdir/run/02.homolog.03.genewise_run.sh";
             print "$command3\n";
             system($command3);
-
+            
             my $command4="sh $outdir/run/02.homolog.04.genewise_output.sh";
             print "$command4\n";
             system($command4);
@@ -149,11 +156,18 @@ sh $outdir/run/02.homolog.04.genewise_output.sh
 
 ### HOMOLOG PREDICTION SECTION END ###
 
+### RNA_Seq PREDICTION SECTION START ###
 
+if ($transcript && $pasa_dir){
+    &run_rna_seq($transcript,$pasa_dir);
+    &run_job("$outdir/run/03.rna_seq.sh");
+}
+
+### RNA_Seq PREDICTION SECTION DONE ###
 
 ### EVM SECTION START ###
 
-my $merge_gff="$outdir/run/03.evm.01.prepare.sh";
+my $merge_gff="$outdir/run/04.evm.01.prepare.sh";
 open(R,"> $merge_gff");
 my $weights="$outdir/temp/evm/weights.txt";
 &MergeGff4EVM();
@@ -161,14 +175,14 @@ close R;
 
 &run_job($merge_gff,"single");
 
-my $run_evm="$outdir/run/03.evm.02.run.sh";
+my $run_evm="$outdir/run/04.evm.02.run.sh";
 open(R,"> $run_evm");
 &runEVM();
 close R;
 
 &run_job($run_evm);
 
-my $collect_gff="$outdir/run/03.evm.03.collect.sh";
+my $collect_gff="$outdir/run/04.evm.03.collect.sh";
 open (R,"> $collect_gff");
 &collect_gff();
 close R;
@@ -177,7 +191,14 @@ close R;
 
 ### EVM SECTION END ###
 
+### UPDATA ANNOTATION BY PASA START ###
 
+if ($transcript && $pasa_dir){
+    &unpdate_by_pasa($pasa_dir);
+    &run_job("$outdir/run/05.pasa_update.sh","single");
+}
+
+### UPDATA ANNOTATION BY PASA DONE ###
 
 ### END OF PROGRAM ###
 
@@ -333,7 +354,10 @@ sub readconfig{
 }
 
 sub MergeGff4EVM{
-    print R "perl $program_base/tools/Prepare4EVM.pl $outdir $weights\n";
+    print R "perl $program_base/tools/Prepare4EVM.pl $outdir $weights yes yes ";
+    if ($transcript){
+        print R "yes\n";
+    }
 }
 
 sub runEVM{
@@ -342,7 +366,11 @@ sub runEVM{
         my $name=$1;
         my $ab_initio="$outdir/temp/evm/dataOFscaffolds/$name/ab_initio.gff";
         my $homolog="$outdir/temp/evm/dataOFscaffolds/$name/homolog.gff";
-        print R "$evm --genome $fa --weights $weights --gene_predictions $ab_initio --protein_alignments $homolog > $outdir/temp/evm/dataOFscaffolds/$name/evm.out; $evm2gff3 $outdir/temp/evm/dataOFscaffolds/$name/evm.out $name > $outdir/temp/evm/dataOFscaffolds/$name/evm.out.gff3\n";
+        my $transparament="";
+        if ($transcript){
+            $transparament="--transcript_alignments $outdir/temp/evm/dataOFscaffolds/$name/rna_seq.gff ";
+        }
+        print R "$evm --genome $fa --weights $weights --gene_predictions $ab_initio --protein_alignments $homolog $transparament> $outdir/temp/evm/dataOFscaffolds/$name/evm.out; $evm2gff3 $outdir/temp/evm/dataOFscaffolds/$name/evm.out $name > $outdir/temp/evm/dataOFscaffolds/$name/evm.out.gff3\n";
     }
 }
 
@@ -407,4 +435,39 @@ sub TransferFormat{
 
 sub collect_gff{
     print R "perl $program_base/tools/collect_gff.pl $outdir\n";
+}
+
+sub run_rna_seq{
+    my ($trans,$pasadir)=@_;
+    ## check pasa ##
+    if (! "$pasadir/seqclean/seqclean/seqclean"){
+        die "Not found compiled seqclean file in \"$pasadir/seqclean/seqclean/seqclean\"\n";
+    }
+    if (! "$pasadir/scripts/Launch_PASA_pipeline.pl"){
+        die "Not found executable file in \"$pasadir/scripts/Launch_PASA_pipeline.pl\"\n";
+    }
+    ## check done ##
+    open (RUN,">$outdir/run/03.rna_seq.sh");
+    my $runpasadir="$outdir/temp/rna_seq";
+    print RUN "cd $runpasadir 
+$pasadir/seqclean/seqclean/seqclean $trans -v $pasadir/seqclean/seqclean/UniVec -c 1 -r Trinity.fasta.cln -o Trinity.fasta.clean | tee 01.seqclean.log
+$pasadir/scripts/Launch_PASA_pipeline.pl -c  $pasadir/pasa_conf/alignAssembly.config -C -R -g $ref -t Trinity.fasta.clean --ALIGNERS blat,gmap --CPU 1 2>&1 | tee 02.pasa_assembly.log
+cd ../../../
+$program_base/split_gff.pl $pasadir $outdir/temp/rna_seq/rna_seq
+";
+}
+
+sub unpdate_by_pasa{
+    my ($pasadir)=@_;
+    my $runpasadir="$outdir/temp/rna_seq";
+    
+    open (RUN,">$outdir/run/05.pasa_update.sh");
+    print RUN "cd $runpasadir ; ln -s ../../prediction.gff orig_annotations_sample.gff3
+$pasadir/scripts/Load_Current_Gene_Annotations.dbi -c $pasadir/pasa_conf/alignAssembly.config -g $ref -P orig_annotations_sample.gff3  2>&1 | tee 03.Loading_your_preexisting_protein-coding_gene_annotations.log
+$pasadir/scripts/Launch_PASA_pipeline.pl -c $pasadir/pasa_conf/annotationCompare.config -A -g $ref -t Trinity.fasta.clean 2>&1 | tee 04.Compare.log
+$program_base/tools/Sort.Redundancy.Rename.pl ./ $species.evmpasa.gff $species
+$gff2protein $species.evmpasa.gff $ref prot > $species.evmpasa.pep
+$gff2protein $species.evmpasa.gff $ref CDS > $species.evmpasa.cds
+";
+    close RUN;
 }
